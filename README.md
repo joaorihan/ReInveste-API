@@ -12,6 +12,8 @@ Sistema de auxílio para pessoas com vício em apostas, focado em incentivar inv
 | Henrique de Brito | RM98831 |
 | Rodrigo Lima | RM98326 |
 
+O Workspace do Postman está disponível em: https://warped-resonance-873879.postman.co/workspace/safsa~7f4fc7d5-2d61-44c8-9818-fc1b0061248b/collection/29513449-b238ceaa-a682-4943-8559-85813c027049?action=share&source=copy-link&creator=29513449
+
 ## 🎯 Objetivo
 
 Este aplicativo tem como objetivo ajudar pessoas que sofrem com vício em apostas, oferecendo:
@@ -23,7 +25,7 @@ Este aplicativo tem como objetivo ajudar pessoas que sofrem com vício em aposta
 
 ### Diagrama de Classes
 
-![Diagrama](img\reinveste.png)
+![Diagrama](img/reinveste.png)
 
 
 
@@ -111,8 +113,6 @@ mvn spring-boot:run
 ### 5. Testando
 
 A aplicação estará disponível em: **http://localhost:8080**
-
-O Workspace do Postman está disponível em: https://warped-resonance-873879.postman.co/workspace/safsa~7f4fc7d5-2d61-44c8-9818-fc1b0061248b/collection/29513449-b238ceaa-a682-4943-8559-85813c027049?action=share&source=copy-link&creator=29513449
 
 ## 📚 Endpoints da API
 
