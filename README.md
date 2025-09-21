@@ -106,6 +106,8 @@ mvn spring-boot:run
 
 A aplicação estará disponível em: **http://localhost:8080**
 
+O Workspace do Postman está disponível em: https://warped-resonance-873879.postman.co/workspace/safsa~7f4fc7d5-2d61-44c8-9818-fc1b0061248b/collection/29513449-b238ceaa-a682-4943-8559-85813c027049?action=share&source=copy-link&creator=29513449
+
 ## 📚 Endpoints da API
 
 ### 👤 Usuários
