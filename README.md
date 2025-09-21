@@ -21,6 +21,12 @@ Este aplicativo tem como objetivo ajudar pessoas que sofrem com vício em aposta
 - Estatísticas e relatórios para conscientização
 - Sistema de recompensas baseado em dias sem apostar
 
+### Diagrama de Classes
+
+![Diagrama](img\reinveste.png)
+
+
+
 ## ✨ Funcionalidades
 
 ### 👤 Gestão de Usuários
