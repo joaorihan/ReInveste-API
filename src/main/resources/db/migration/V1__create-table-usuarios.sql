@@ -1,0 +1,23 @@
+CREATE TABLE usuarios (
+    id BIGINT AUTO_INCREMENT PRIMARY KEY,
+    nome VARCHAR(100) NOT NULL,
+    email VARCHAR(100) NOT NULL UNIQUE,
+    telefone VARCHAR(15) NOT NULL,
+    cpf VARCHAR(11) NOT NULL UNIQUE,
+    data_nascimento DATE NOT NULL,
+    nivel_vicio VARCHAR(20) NOT NULL,
+    valor_gasto_apostas DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    meta_investimento_mensal DECIMAL(10,2) NOT NULL DEFAULT 0.00,
+    data_ultima_aposta DATETIME,
+    dias_sem_apostar INT NOT NULL DEFAULT 0,
+    ativo BOOLEAN NOT NULL DEFAULT TRUE,
+    data_criacao DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    data_atualizacao DATETIME,
+    logradouro VARCHAR(100) NOT NULL,
+    numero VARCHAR(10),
+    complemento VARCHAR(100),
+    bairro VARCHAR(100) NOT NULL,
+    cidade VARCHAR(100) NOT NULL,
+    uf VARCHAR(2) NOT NULL,
+    cep VARCHAR(8) NOT NULL
+);
