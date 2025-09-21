@@ -293,22 +293,3 @@ src/
 │       └── db/migration/          # Migrações do banco
 └── test/                          # Testes
 ```
-
-## 🔒 Segurança e Boas Práticas
-
-- Validação de entrada em todos os endpoints
-- Tratamento global de exceções
-- Exclusão lógica em vez de exclusão física
-- Uso de DTOs para transferência de dados
-- Separação clara entre camadas
-- Código limpo e bem documentado
-- Migrações versionadas do banco de dados
-
-## 📈 Próximos Passos
-
-- Implementação de autenticação e autorização
-- Sistema de notificações por email/SMS
-- Dashboard web para visualização de dados
-- Integração com APIs de investimento
-- Sistema de gamificação e recompensas
-- Relatórios avançados com gráficos
