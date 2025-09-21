@@ -72,8 +72,8 @@ Este aplicativo tem como objetivo ajudar pessoas que sofrem com vício em aposta
 
 ### 2. Clone o Repositório
 ```bash
-git clone https://github.com/seu-usuario/xp-investimento-auxilio.git
-cd xp-investimento-auxilio
+git clone https://github.com/joaorihan/ReInveste-API.git
+cd ReInveste-API
 ```
 
 ### 3. Configure o Banco de Dados
