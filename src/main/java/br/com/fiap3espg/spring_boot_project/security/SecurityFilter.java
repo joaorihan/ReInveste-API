@@ -29,7 +29,7 @@ public class SecurityFilter extends OncePerRequestFilter {
         
         String token = extractTokenFromRequest(request);
 
-        if (token != null && jwtUtil.isTokenValid(token)) {
+        if (jwtUtil.isTokenValid(token)) {
             String email = jwtUtil.getEmailFromToken(token);
             UserDetails usuario = usuarioRepository.findByEmail(email);
 
