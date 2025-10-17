@@ -72,8 +72,13 @@ public class ValidationService implements IValidationService {
                 validarInvestimento(dados);
                 break;
             case ECONOMIA:
-                // Validações específicas para economia podem ser adicionadas aqui
+                validarEconomia(dados.valor());
                 break;
+            case RESGATE:
+                validarResgate(dados);
+                break;
+            default:
+                throw new BusinessRuleException("Tipo de transação inválido");
         }
     }
     
@@ -90,6 +95,23 @@ public class ValidationService implements IValidationService {
     private void validarInvestimento(DadosCadastroTransacao dados) {
         if (dados.metaId() == null) {
             throw new BusinessRuleException("Investimentos devem estar associados a uma meta");
+        }
+    }
+    
+    private void validarEconomia(BigDecimal valorEconomia) {
+        // Economia não pode ser um valor muito alto (possivelmente erro de digitação)
+        BigDecimal limiteEconomia = new BigDecimal("100000.00");
+        if (valorEconomia.compareTo(limiteEconomia) > 0) {
+            throw new BusinessRuleException(
+                String.format("Valor de economia (R$ %.2f) parece muito alto. Verifique o valor informado.", 
+                    valorEconomia)
+            );
+        }
+    }
+    
+    private void validarResgate(DadosCadastroTransacao dados) {
+        if (dados.metaId() == null) {
+            throw new BusinessRuleException("Resgates devem estar associados a uma meta de investimento");
         }
     }
 }
