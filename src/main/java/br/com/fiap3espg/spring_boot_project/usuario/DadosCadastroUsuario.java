@@ -15,6 +15,10 @@ public record DadosCadastroUsuario(
     @Email(message = "Email deve ter formato válido")
     String email,
     
+    @NotBlank(message = "Senha é obrigatória")
+    @Size(min = 6, message = "Senha deve ter no mínimo 6 caracteres")
+    String senha,
+    
     @NotBlank(message = "Telefone é obrigatório")
     @Pattern(regexp = "\\d{10,11}", message = "Telefone deve ter 10 ou 11 dígitos")
     String telefone,

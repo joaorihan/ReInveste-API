@@ -1,7 +1,11 @@
 package br.com.fiap3espg.spring_boot_project.controller;
 
-import br.com.fiap3espg.spring_boot_project.service.TransacaoService;
+import br.com.fiap3espg.spring_boot_project.service.ITransacaoService;
 import br.com.fiap3espg.spring_boot_project.transacao.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
@@ -17,22 +21,26 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/transacoes")
+@Tag(name = "Transações", description = "Gerenciamento de transações financeiras (investimentos, economias e apostas)")
+@SecurityRequirement(name = "bearerAuth")
 public class TransacaoController {
 
     @Autowired
-    private TransacaoService transacaoService;
+    private ITransacaoService transacaoService;
 
+    @Operation(summary = "Cadastrar transação", description = "Registra uma nova transação (investimento, economia ou aposta)")
     @PostMapping("/usuario/{usuarioId}")
     public ResponseEntity<DadosListagemTransacao> cadastrar(
-            @PathVariable Long usuarioId,
+            @Parameter(description = "ID do usuário") @PathVariable Long usuarioId,
             @RequestBody @Valid DadosCadastroTransacao dados) {
         DadosListagemTransacao transacao = transacaoService.cadastrar(dados, usuarioId);
         return ResponseEntity.ok(transacao);
     }
 
+    @Operation(summary = "Listar transações por usuário", description = "Retorna todas as transações de um usuário")
     @GetMapping("/usuario/{usuarioId}")
     public ResponseEntity<Page<DadosListagemTransacao>> listarPorUsuario(
-            @PathVariable Long usuarioId,
+            @Parameter(description = "ID do usuário") @PathVariable Long usuarioId,
             @PageableDefault(size = 10, sort = {"dataTransacao"}) Pageable paginacao) {
         Page<DadosListagemTransacao> transacoes = transacaoService.listarPorUsuario(usuarioId, paginacao);
         return ResponseEntity.ok(transacoes);

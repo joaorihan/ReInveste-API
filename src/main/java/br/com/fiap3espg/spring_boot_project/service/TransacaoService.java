@@ -1,7 +1,9 @@
 package br.com.fiap3espg.spring_boot_project.service;
 
+import br.com.fiap3espg.spring_boot_project.exception.ResourceNotFoundException;
 import br.com.fiap3espg.spring_boot_project.meta.Meta;
 import br.com.fiap3espg.spring_boot_project.meta.MetaRepository;
+import br.com.fiap3espg.spring_boot_project.service.validation.IValidationService;
 import br.com.fiap3espg.spring_boot_project.transacao.*;
 import br.com.fiap3espg.spring_boot_project.usuario.Usuario;
 import br.com.fiap3espg.spring_boot_project.usuario.UsuarioRepository;
@@ -17,7 +19,7 @@ import java.util.List;
 
 @Service
 @Transactional
-public class TransacaoService {
+public class TransacaoService implements ITransacaoService {
 
     @Autowired
     private TransacaoRepository transacaoRepository;
@@ -27,18 +29,22 @@ public class TransacaoService {
     
     @Autowired
     private MetaRepository metaRepository;
+    
+    @Autowired
+    private IValidationService validationService;
 
+    @Override
     public DadosListagemTransacao cadastrar(DadosCadastroTransacao dados, Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         Meta meta = null;
         if (dados.metaId() != null) {
             meta = metaRepository.findById(dados.metaId())
-                    .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Meta", dados.metaId()));
         }
         
-        validarTransacao(dados, usuario);
+        validationService.validarTransacao(dados, usuario);
         
         Transacao transacao = new Transacao(dados, usuario, meta);
         transacaoRepository.save(transacao);
@@ -51,25 +57,28 @@ public class TransacaoService {
         return new DadosListagemTransacao(transacao);
     }
 
+    @Override
     public Page<DadosListagemTransacao> listarPorUsuario(Long usuarioId, Pageable paginacao) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         return transacaoRepository.findByUsuarioOrderByDataTransacaoDesc(usuario, paginacao)
                 .map(DadosListagemTransacao::new);
     }
 
+    @Override
     public Page<DadosListagemTransacao> listarPorTipo(Long usuarioId, TipoTransacao tipo, Pageable paginacao) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         return transacaoRepository.findByUsuarioAndTipoTransacao(usuario, tipo, paginacao)
                 .map(DadosListagemTransacao::new);
     }
 
+    @Override
     public List<DadosListagemTransacao> listarPorPeriodo(Long usuarioId, LocalDateTime dataInicio, LocalDateTime dataFim) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         return transacaoRepository.findByUsuarioAndDataTransacaoBetween(usuario, dataInicio, dataFim)
                 .stream()
@@ -77,9 +86,10 @@ public class TransacaoService {
                 .toList();
     }
 
+    @Override
     public void confirmarTransacao(Long id) {
         Transacao transacao = transacaoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Transação não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Transação", id));
         
         transacao.confirmar();
         
@@ -89,63 +99,47 @@ public class TransacaoService {
         }
     }
 
+    @Override
     public void cancelarTransacao(Long id) {
         Transacao transacao = transacaoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Transação não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Transação", id));
         
         transacao.cancelar();
     }
 
+    @Override
     public BigDecimal calcularTotalInvestimentos(Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         Double total = transacaoRepository.calcularTotalPorTipo(usuario, TipoTransacao.INVESTIMENTO);
         return total != null ? BigDecimal.valueOf(total) : BigDecimal.ZERO;
     }
 
+    @Override
     public BigDecimal calcularTotalEconomias(Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         Double total = transacaoRepository.calcularTotalPorTipo(usuario, TipoTransacao.ECONOMIA);
         return total != null ? BigDecimal.valueOf(total) : BigDecimal.ZERO;
     }
 
+    @Override
     public BigDecimal calcularTotalApostas(Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         Double total = transacaoRepository.calcularTotalPorTipo(usuario, TipoTransacao.APOSTA);
         return total != null ? BigDecimal.valueOf(total) : BigDecimal.ZERO;
     }
 
+    @Override
     public Long contarApostasRecentes(Long usuarioId, Integer dias) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         LocalDateTime dataInicio = LocalDateTime.now().minusDays(dias);
         return transacaoRepository.countApostasRecentes(usuario, dataInicio);
-    }
-
-    private void validarTransacao(DadosCadastroTransacao dados, Usuario usuario) {
-        if (dados.valor().compareTo(BigDecimal.ZERO) <= 0) {
-            throw new RuntimeException("Valor da transação deve ser maior que zero");
-        }
-        
-        // Validações específicas por tipo de transação
-        switch (dados.tipoTransacao()) {
-            case APOSTA:
-                BigDecimal limiteAposta = usuario.getMetaInvestimentoMensal().multiply(new BigDecimal("2"));
-                if (dados.valor().compareTo(limiteAposta) > 0) {
-                    throw new RuntimeException("Valor da aposta muito alto em relação à meta de investimento");
-                }
-                break;
-            case INVESTIMENTO:
-                if (dados.metaId() == null) {
-                    throw new RuntimeException("Investimentos devem estar associados a uma meta");
-                }
-                break;
-        }
     }
 }

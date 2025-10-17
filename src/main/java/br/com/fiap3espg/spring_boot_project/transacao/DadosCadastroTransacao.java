@@ -16,12 +16,8 @@ public record DadosCadastroTransacao(
     @DecimalMin(value = "0.01", message = "Valor deve ser maior que zero")
     BigDecimal valor,
     
-    @NotNull(message = "Data da transação é obrigatória")
-    @Past(message = "Data da transação deve ser no passado")
-    LocalDateTime dataTransacao,
+    Long metaId,
     
     @Size(max = 500, message = "Observações devem ter no máximo 500 caracteres")
-    String observacoes,
-    
-    Long metaId
+    String observacoes
 ) {}
