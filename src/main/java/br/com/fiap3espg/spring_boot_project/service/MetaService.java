@@ -1,6 +1,9 @@
 package br.com.fiap3espg.spring_boot_project.service;
 
+import br.com.fiap3espg.spring_boot_project.exception.BusinessRuleException;
+import br.com.fiap3espg.spring_boot_project.exception.ResourceNotFoundException;
 import br.com.fiap3espg.spring_boot_project.meta.*;
+import br.com.fiap3espg.spring_boot_project.service.validation.IValidationService;
 import br.com.fiap3espg.spring_boot_project.usuario.Usuario;
 import br.com.fiap3espg.spring_boot_project.usuario.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,20 +18,24 @@ import java.util.List;
 
 @Service
 @Transactional
-public class MetaService {
+public class MetaService implements IMetaService {
 
     @Autowired
     private MetaRepository metaRepository;
     
     @Autowired
     private UsuarioRepository usuarioRepository;
+    
+    @Autowired
+    private IValidationService validationService;
 
+    @Override
     public DadosListagemMeta cadastrar(DadosCadastroMeta dados, Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
-        validarDatasMeta(dados.dataInicio(), dados.dataFim());
-        validarLimiteMetasAtivas(usuario);
+        validationService.validarDatasMeta(dados.dataInicio(), dados.dataFim());
+        validationService.validarLimiteMetasAtivas(usuario);
         
         Meta meta = new Meta(dados, usuario);
         metaRepository.save(meta);
@@ -36,35 +43,39 @@ public class MetaService {
         return new DadosListagemMeta(meta);
     }
 
+    @Override
     public Page<DadosListagemMeta> listarPorUsuario(Long usuarioId, Pageable paginacao) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         return metaRepository.findByUsuarioOrderByDataCriacaoDesc(usuario, paginacao)
                 .map(DadosListagemMeta::new);
     }
 
+    @Override
     public Page<DadosListagemMeta> listarMetasAtivas(Long usuarioId, Pageable paginacao) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         return metaRepository.findByUsuarioAndStatus(usuario, StatusMeta.ATIVA, paginacao)
                 .map(DadosListagemMeta::new);
     }
 
+    @Override
     public DadosListagemMeta buscarPorId(Long id) {
         Meta meta = metaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Meta", id));
         
         return new DadosListagemMeta(meta);
     }
 
+    @Override
     public void atualizarProgresso(Long metaId, BigDecimal valorAdicional) {
         Meta meta = metaRepository.findById(metaId)
-                .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Meta", metaId));
         
         if (!meta.getStatus().equals(StatusMeta.ATIVA)) {
-            throw new RuntimeException("Meta não está ativa");
+            throw new BusinessRuleException("Meta não está ativa e não pode ter seu progresso atualizado");
         }
         
         meta.atualizarProgresso(valorAdicional);
@@ -75,13 +86,15 @@ public class MetaService {
         }
     }
 
+    @Override
     public void cancelarMeta(Long id) {
         Meta meta = metaRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Meta não encontrada"));
+                .orElseThrow(() -> new ResourceNotFoundException("Meta", id));
         
         meta.cancelar();
     }
 
+    @Override
     public List<DadosListagemMeta> buscarMetasVencidas() {
         List<Meta> metasVencidas = metaRepository.findMetasVencidas(LocalDate.now());
         return metasVencidas.stream()
@@ -89,28 +102,12 @@ public class MetaService {
                 .toList();
     }
 
+    @Override
     public Long contarMetasConcluidas(Long usuarioId) {
         Usuario usuario = usuarioRepository.findById(usuarioId)
-                .orElseThrow(() -> new RuntimeException("Usuário não encontrado"));
+                .orElseThrow(() -> new ResourceNotFoundException("Usuário", usuarioId));
         
         return metaRepository.countMetasConcluidasByUsuario(usuario);
-    }
-
-    private void validarDatasMeta(LocalDate dataInicio, LocalDate dataFim) {
-        if (dataFim.isBefore(dataInicio)) {
-            throw new RuntimeException("Data de fim deve ser posterior à data de início");
-        }
-        
-        if (dataInicio.isBefore(LocalDate.now())) {
-            throw new RuntimeException("Data de início deve ser no futuro");
-        }
-    }
-
-    private void validarLimiteMetasAtivas(Usuario usuario) {
-        List<Meta> metasAtivas = metaRepository.findMetasAtivasByUsuario(usuario);
-        if (metasAtivas.size() >= 5) {
-            throw new RuntimeException("Limite máximo de 5 metas ativas por usuário");
-        }
     }
 
     private void atualizarEstatisticasUsuario(Usuario usuario) {
