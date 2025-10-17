@@ -20,7 +20,7 @@ import java.util.List;
 public class TransacaoController {
 
     @Autowired
-    private TransacaoService transacaoService;
+    private ITransacaoService transacaoService;
 
     @PostMapping("/usuario/{usuarioId}")
     public ResponseEntity<DadosListagemTransacao> cadastrar(

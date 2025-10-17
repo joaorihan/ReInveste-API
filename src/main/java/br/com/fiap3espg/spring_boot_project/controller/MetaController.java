@@ -18,7 +18,7 @@ import java.util.List;
 public class MetaController {
 
     @Autowired
-    private MetaService metaService;
+    private IMetaService metaService;
 
     @PostMapping("/usuario/{usuarioId}")
     public ResponseEntity<DadosListagemMeta> cadastrar(
