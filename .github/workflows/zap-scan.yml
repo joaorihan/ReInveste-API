@@ -1,0 +1,233 @@
+name: OWASP ZAP Security Scan
+
+on:
+  push:
+    branches: [ main, master, Atividade-Cybersec ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:  # Permite execução manual
+
+jobs:
+  zap-scan:
+    name: Scan de Segurança com OWASP ZAP
+    runs-on: ubuntu-latest
+    
+    steps:
+      # ============================================
+      # 1) CHECKOUT DO CÓDIGO
+      # ============================================
+      - name: Checkout do repositório
+        uses: actions/checkout@v4
+
+      # ============================================
+      # 2) CONFIGURAR JAVA 21
+      # ============================================
+      - name: Configurar Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      # ============================================
+      # 3) COMPILAR A APLICAÇÃO
+      # ============================================
+      - name: Compilar aplicação com Maven
+        run: mvn clean package -DskipTests
+
+      # ============================================
+      # 4) INICIAR A APLICAÇÃO EM BACKGROUND
+      # ============================================
+      - name: Iniciar aplicação Spring Boot
+        run: |
+          echo "Iniciando aplicação Spring Boot..."
+          # Usar perfil 'ci' com H2 para não precisar de MySQL
+          nohup java -jar -Dspring.profiles.active=ci target/*.jar > app.log 2>&1 &
+          echo $! > app.pid
+          
+          echo "Aguardando aplicação iniciar (até 60 segundos)..."
+          timeout 60 bash -c 'until curl -f http://localhost:8080/actuator/health || curl -f http://localhost:8080/api/health || curl -f http://localhost:8080; do sleep 2; done' || echo "Aplicação pode não ter iniciado completamente"
+          
+          echo "Aplicação iniciada!"
+          echo "Log da aplicação:"
+          cat app.log | tail -n 20
+
+      # ============================================
+      # 5) EXECUTAR OWASP ZAP SCAN
+      # ============================================
+      - name: Executar OWASP ZAP Baseline Scan
+        run: |
+          echo "Iniciando scan OWASP ZAP..."
+          
+          # Criar diretório para relatórios
+          mkdir -p zap-reports
+          
+          # Executar ZAP em modo baseline (passivo + spider)
+          # --network host: permite que o container acesse localhost do runner
+          # -t: target URL
+          # -r: relatório HTML
+          # -J: relatório JSON
+          # -I: não retornar erro (vamos analisar o JSON depois)
+          docker run --network host \
+            -v $(pwd)/zap-reports:/zap/wrk/:rw \
+            -t ghcr.io/zaproxy/zaproxy:stable \
+            zap-baseline.py \
+            -t http://localhost:8080 \
+            -r zap_report.html \
+            -J zap_report.json \
+            -I || true
+          
+          echo "Scan concluído!"
+
+      # ============================================
+      # 6) ANALISAR RESULTADOS COM JQ
+      # ============================================
+      - name: Analisar resultados do scan
+        id: analyze
+        run: |
+          cd zap-reports
+          
+          echo "========================================="
+          echo "ANALISE DO RELATORIO OWASP ZAP"
+          echo "========================================="
+          echo ""
+          
+          # Instalar jq (já vem no ubuntu-latest, mas garantir)
+          if ! command -v jq &> /dev/null; then
+            sudo apt-get update && sudo apt-get install -y jq
+          fi
+          
+          # Verificar se o arquivo JSON existe
+          if [ ! -f "zap_report.json" ]; then
+            echo "ERRO: Arquivo zap_report.json não encontrado!"
+            exit 1
+          fi
+          
+          # ============================================
+          # EXTRAIR INFORMAÇÕES DO JSON
+          # ============================================
+          
+          # Total de alertas
+          TOTAL_ALERTS=$(jq '[.site[].alerts[]] | length' zap_report.json)
+          echo "Total de Alertas: $TOTAL_ALERTS"
+          echo ""
+          
+          # Alertas por severidade
+          echo "Alertas por Severidade:"
+          echo "-------------------------------------"
+          
+          CRITICAL=$(jq '[.site[].alerts[] | select(.riskcode == "3" or .riskdesc == "Critical")] | length' zap_report.json)
+          HIGH=$(jq '[.site[].alerts[] | select(.riskcode == "3" or .riskdesc == "High")] | length' zap_report.json)
+          MEDIUM=$(jq '[.site[].alerts[] | select(.riskcode == "2" or .riskdesc == "Medium")] | length' zap_report.json)
+          LOW=$(jq '[.site[].alerts[] | select(.riskcode == "1" or .riskdesc == "Low")] | length' zap_report.json)
+          INFO=$(jq '[.site[].alerts[] | select(.riskcode == "0" or .riskdesc == "Informational")] | length' zap_report.json)
+          
+          echo "Critical: $CRITICAL"
+          echo "High: $HIGH"
+          echo "Medium: $MEDIUM"
+          echo "Low: $LOW"
+          echo "Informational: $INFO"
+          echo ""
+          
+          # Salvar em variáveis de saída
+          echo "critical=$CRITICAL" >> $GITHUB_OUTPUT
+          echo "high=$HIGH" >> $GITHUB_OUTPUT
+          echo "medium=$MEDIUM" >> $GITHUB_OUTPUT
+          echo "low=$LOW" >> $GITHUB_OUTPUT
+          echo "info=$INFO" >> $GITHUB_OUTPUT
+          echo "total=$TOTAL_ALERTS" >> $GITHUB_OUTPUT
+          
+          # ============================================
+          # TOP 5 VULNERABILIDADES MAIS COMUNS
+          # ============================================
+          echo "Top 5 Vulnerabilidades Mais Comuns:"
+          echo "-------------------------------------"
+          jq -r '[.site[].alerts[]] | group_by(.alert) | map({alert: .[0].alert, count: length, risk: .[0].riskdesc}) | sort_by(-.count) | limit(5;.[]) | "  \(.count)x [\(.risk)] \(.alert)"' zap_report.json
+          echo ""
+          
+          # ============================================
+          # DETALHES DAS VULNERABILIDADES HIGH/CRITICAL
+          # ============================================
+          if [ $HIGH -gt 0 ] || [ $CRITICAL -gt 0 ]; then
+            echo "VULNERABILIDADES HIGH/CRITICAL ENCONTRADAS:"
+            echo "============================================"
+            
+            jq -r '[.site[].alerts[] | select(.riskcode == "3" or .riskdesc == "High" or .riskdesc == "Critical")] | .[] | "
+ALERTA: \(.alert)
+   Severidade: \(.riskdesc)
+   Confianca: \(.confidence)
+   Descricao: \(.desc // "N/A")
+   Solucao: \(.solution // "N/A")
+   URLs Afetadas: \([.instances[].uri] | join(", "))
+============================================
+"' zap_report.json
+          fi
+          
+          # ============================================
+          # FALHAR SE HOUVER HIGH OU CRITICAL
+          # ============================================
+          if [ $HIGH -gt 0 ] || [ $CRITICAL -gt 0 ]; then
+            echo ""
+            echo "========================================="
+            echo "PIPELINE FALHADO!"
+            echo "Encontradas $CRITICAL Critical e $HIGH High"
+            echo "========================================="
+            exit 1
+          else
+            echo ""
+            echo "========================================="
+            echo "SCAN APROVADO!"
+            echo "Nenhuma vulnerabilidade Critical/High"
+            echo "========================================="
+          fi
+
+      # ============================================
+      # 7) UPLOAD DO RELATÓRIO HTML COMO ARTEFATO
+      # ============================================
+      - name: Upload do relatório ZAP
+        uses: actions/upload-artifact@v4
+        if: always()  # Sempre fazer upload, mesmo se o job falhar
+        with:
+          name: zap-security-report
+          path: |
+            zap-reports/zap_report.html
+            zap-reports/zap_report.json
+          retention-days: 30
+
+      # ============================================
+      # 8) CRIAR SUMÁRIO NO GITHUB
+      # ============================================
+      - name: Criar sumário no GitHub
+        if: always()
+        run: |
+          echo "## Relatorio de Seguranca OWASP ZAP" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Resumo dos Alertas" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Severidade | Quantidade |" >> $GITHUB_STEP_SUMMARY
+          echo "|------------|------------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Critical | ${{ steps.analyze.outputs.critical }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| High | ${{ steps.analyze.outputs.high }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Medium | ${{ steps.analyze.outputs.medium }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Low | ${{ steps.analyze.outputs.low }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Info | ${{ steps.analyze.outputs.info }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Total** | **${{ steps.analyze.outputs.total }}** |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Relatorios" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Os relatorios HTML e JSON estao disponiveis nos artefatos desta execucao." >> $GITHUB_STEP_SUMMARY
+
+      # ============================================
+      # 9) PARAR A APLICAÇÃO
+      # ============================================
+      - name: Parar aplicação
+        if: always()
+        run: |
+          if [ -f app.pid ]; then
+            echo "Parando aplicação..."
+            kill $(cat app.pid) || true
+          fi
+          
+          echo "Ultimas linhas do log da aplicacao:"
+          cat app.log | tail -n 50 || true
+
